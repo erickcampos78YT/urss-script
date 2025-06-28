@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Função para verificar se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Função para verificar se o usuário é o dono do documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Permitir leitura de comentários para todos
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isAuthenticated() 
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 1000;
+      allow update: if isAuthenticated() 
+        && (isOwner(resource.data.authorId) || 
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'userVotes'])));
+      allow delete: if isOwner(resource.data.authorId);
+    }
+      
+      return content is string 
+        && content.size() > 0 
+        && content.size() <= 1000
+        && isEdited is bool
+        && updatedAt is timestamp;
+    }
+
+    // Regras para a coleção de scripts
+    match /scripts/{scriptId} {
+      // Qualquer um pode ler os scripts
+      allow read: if true;
+      
+      // Apenas usuários autenticados podem criar scripts
+      allow create: if isAuthenticated();
+      
+      // Apenas o dono pode atualizar ou deletar seus scripts
+      allow update, delete: if isOwner(resource.data.authorId);
+    }
+
+    // Regras para a coleção de usuários
+    match /users/{userId} {
+      // Qualquer um pode ler perfis de usuário
+      allow read: if true;
+      
+      // Usuários podem criar/atualizar apenas seu próprio perfil
+      allow write: if isOwner(userId);
+    }
+
+    // Regras para comentários
+    match /comments/{commentId} {
+      // Qualquer um pode ler comentários
+      allow read: if true;
+      
+      // Usuários autenticados podem criar comentários
+      allow create: if isAuthenticated();
+      
+      // Apenas o autor pode atualizar seus comentários
+      allow update: if isOwner(resource.data.authorId) || 
+        (isAuthenticated() && 
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['votes', 'userVotes']));
+      
+      // Apenas o autor pode deletar seus comentários
+      allow delete: if isOwner(resource.data.authorId);
+    }
+  }
+} 

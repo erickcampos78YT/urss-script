@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Função para verificar se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Função para verificar se o arquivo pertence ao usuário
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Regras para arquivos de scripts
+    match /scripts/{userId}/{scriptId}/{fileName} {
+      // Qualquer um pode baixar os arquivos
+      allow read: if true;
+      
+      // Apenas usuários autenticados podem fazer upload
+      // e apenas em sua própria pasta
+      allow create: if isAuthenticated() 
+        && userId == request.auth.uid
+        && request.resource.size < 5 * 1024 * 1024 // Limite de 5MB
+        && request.resource.contentType.matches('text/.*|application/.*');
+      
+      // Apenas o dono pode atualizar ou deletar seus arquivos
+      allow update, delete: if isAuthenticated() 
+        && userId == request.auth.uid;
+    }
+
+    // Regras para avatares de usuários
+    match /avatars/{userId} {
+      // Qualquer um pode ver os avatares
+      allow read: if true;
+      
+      // Usuários podem fazer upload apenas de seu próprio avatar
+      allow create, update: if isAuthenticated() 
+        && userId == request.auth.uid
+        && request.resource.size < 2 * 1024 * 1024 // Limite de 2MB
+        && request.resource.contentType.matches('image/.*');
+      
+      // Apenas o dono pode deletar seu avatar
+      allow delete: if isAuthenticated() 
+        && userId == request.auth.uid;
+    }
+  }
+} 
