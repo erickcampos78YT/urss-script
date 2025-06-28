@@ -80,26 +80,17 @@ const colors = [
 //   });
 // };
 
-const mockUserStats = {
-  totalLines: 1234,
-  languages: [
-    { name: 'JavaScript', lines: 600 },
-    { name: 'TypeScript', lines: 400 },
-    { name: 'Python', lines: 234 },
-  ],
-};
-
 const Profile = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  // const [scripts, setScripts] = useState<Script[]>([]);
-  // const [comments, setComments] = useState<Comment[]>([]);
-  // const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState<string>('');
-  // const [loadingData, setLoadingData] = useState(true);
-  // const [totalLines, setTotalLines] = useState(0);
-  // const [languageStats, setLanguageStats] = useState<{ [key: string]: number }>({});
-  // const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [scripts, setScripts] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [loadingData, setLoadingData] = useState(true);
+  const [totalLines, setTotalLines] = useState(0);
+  const [languageStats, setLanguageStats] = useState({});
+  const canvasRef = useRef(null);
 
   // Verificar autenticação
   useEffect(() => {
@@ -110,127 +101,138 @@ const Profile = () => {
   }, [currentUser, navigate]);
 
   // Carregar dados do usuário
-  // useEffect(() => {
-  //   const fetchUserData = async () => {
-  //     if (!currentUser) return;
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!currentUser) return;
 
-  //     setLoadingData(true);
-  //     setError('');
+      setLoadingData(true);
+      setError('');
 
-  //     try {
-  //       // Fetch user's scripts
-  //       const scriptsQuery = query(
-  //         collection(db, 'scripts'),
-  //         where('authorId', '==', currentUser.uid)
-  //       );
+      try {
+        // Buscar scripts do usuário
+        const scriptsQuery = query(
+          collection(db, 'scripts'),
+          where('authorId', '==', currentUser.uid)
+        );
 
-  //       const scriptsSnapshot = await getDocs(scriptsQuery);
-  //       const scriptsData = scriptsSnapshot.docs.map(doc => ({
-  //         id: doc.id,
-  //         ...doc.data()
-  //       })) as Script[];
+        const scriptsSnapshot = await getDocs(scriptsQuery);
+        const scriptsData = scriptsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setScripts(scriptsData);
 
-  //       setScripts(scriptsData);
+        // Buscar comentários do usuário
+        const commentsQuery = query(
+          collection(db, 'comments'),
+          where('authorId', '==', currentUser.uid)
+        );
 
-  //       // Fetch user's comments
-  //       const commentsQuery = query(
-  //         collection(db, 'comments'),
-  //         where('authorId', '==', currentUser.uid)
-  //       );
-
-  //       const commentsSnapshot = await getDocs(commentsQuery);
-  //       const commentsData = await Promise.all(
-  //         commentsSnapshot.docs.map(async (doc) => {
-  //           const comment = doc.data();
-  //           // Fetch script title for each comment
-  //           const scriptDoc = await getDocs(query(
-  //             collection(db, 'scripts'),
-  //             where('id', '==', comment.scriptId)
-  //           ));
-  //           const scriptTitle = scriptDoc.docs[0]?.data()?.title || 'Unknown Script';
+        const commentsSnapshot = await getDocs(commentsQuery);
+        const commentsData = await Promise.all(
+          commentsSnapshot.docs.map(async (doc) => {
+            const comment = doc.data();
+            // Buscar título do script para cada comentário
+            const scriptDoc = await getDocs(query(
+              collection(db, 'scripts'),
+              where('id', '==', comment.scriptId)
+            ));
+            const scriptTitle = scriptDoc.docs[0]?.data()?.title || 'Unknown Script';
             
-  //           return {
-  //             id: doc.id,
-  //             content: comment.content,
-  //             scriptId: comment.scriptId,
-  //             scriptTitle,
-  //             createdAt: comment.createdAt,
-  //             updatedAt: comment.updatedAt,
-  //             authorId: comment.authorId,
-  //             authorName: comment.authorName || 'Anonymous',
-  //             isEdited: comment.isEdited || false,
-  //             votes: comment.votes || 0,
-  //             userVotes: comment.userVotes || {},
-  //             parentId: comment.parentId,
-  //             replies: []
-  //           };
-  //         })
-  //       );
+            return {
+              id: doc.id,
+              content: comment.content,
+              scriptId: comment.scriptId,
+              scriptTitle,
+              createdAt: comment.createdAt,
+              updatedAt: comment.updatedAt,
+              authorId: comment.authorId,
+              authorName: comment.authorName || 'Anonymous',
+              isEdited: comment.isEdited || false,
+              votes: comment.votes || 0,
+              userVotes: comment.userVotes || {},
+              parentId: comment.parentId,
+              replies: []
+            };
+          })
+        );
 
-  //       setComments(commentsData);
+        setComments(commentsData);
 
-  //       // Calculate total lines of code
-  //       const lines = scriptsData.reduce((acc, script) => {
-  //         return acc + (script.code?.split('\n').length || 0);
-  //       }, 0);
-  //       setTotalLines(lines);
+        // Calcular total de linhas de código
+        const lines = scriptsData.reduce((acc, script) => {
+          return acc + (script.code?.split('\n').length || 0);
+        }, 0);
+        setTotalLines(lines);
 
-  //       // Calculate language statistics
-  //       const stats = scriptsData.reduce((acc, script) => {
-  //         acc[script.language] = (acc[script.language] || 0) + 1;
-  //         return acc;
-  //       }, {} as { [key: string]: number });
-  //       setLanguageStats(stats);
-  //     } catch (error) {
-  //       console.error('Error fetching user data:', error);
-  //       setError('Failed to load profile data. Please try again later.');
-  //     } finally {
-  //       setLoadingData(false);
-  //       setLoading(false);
-  //     }
-  //   };
+        // Calcular estatísticas de linguagens
+        const stats = scriptsData.reduce((acc, script) => {
+          acc[script.language] = (acc[script.language] || 0) + (script.code?.split('\n').length || 0);
+          return acc;
+        }, {});
+        setLanguageStats(stats);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setError('Failed to load profile data. Please try again later.');
+      } finally {
+        setLoadingData(false);
+        setLoading(false);
+      }
+    };
 
-  //   fetchUserData();
-  // }, [currentUser]);
+    fetchUserData();
+  }, [currentUser]);
 
-  // useEffect(() => {
-  //   if (canvasRef.current && Object.keys(languageStats).length > 0) {
-  //     const ctx = canvasRef.current.getContext('2d');
-  //     if (ctx) {
-  //       drawPieChart(ctx, languageStats, canvasRef.current.width, canvasRef.current.height);
-  //     }
-  //   }
-  // }, [languageStats]);
+  useEffect(() => {
+    if (canvasRef.current && Object.keys(languageStats).length > 0) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        // Função de gráfico de pizza
+        const total = Object.values(languageStats).reduce((sum, value) => sum + value, 0);
+        let startAngle = 0;
+        ctx.clearRect(0, 0, 300, 300);
+        const centerX = 150;
+        const centerY = 150;
+        const radius = 140;
+        Object.entries(languageStats).forEach(([language, count], index) => {
+          const sliceAngle = (count / total) * 2 * Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+          ctx.fillStyle = colors[index % colors.length];
+          ctx.fill();
+          startAngle += sliceAngle;
+        });
+      }
+    }
+  }, [languageStats]);
 
-  // const totalLikes = scripts.reduce((acc, script) => acc + (script.likes || 0), 0);
-  // const totalComments = scripts.reduce((acc, script) => acc + (script.comments || 0), 0);
+  const totalLikes = scripts.reduce((acc, script) => acc + (script.likes || 0), 0);
+  const totalComments = scripts.reduce((acc, script) => acc + (script.comments || 0), 0);
 
-  // if (loading) {
-  //   return (
-  //     <div className="flex justify-center items-center min-h-screen">
-  //       <LoadingSpinner />
-  //     </div>
-  //   );
-  // }
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
-  // if (error) {
-  //   return (
-  //     <div className="flex flex-col items-center justify-center min-h-screen">
-  //       <div className="bg-carmine/20 border border-carmine text-carmine px-6 py-4 rounded-xl mb-4 text-center">
-  //         {error}
-  //       </div>
-  //       <button
-  //         onClick={() => window.location.reload()}
-  //         className="px-4 py-2 bg-carmine rounded-xl hover:bg-carmine/90 transition-colors"
-  //       >
-  //         Try Again
-  //       </button>
-  //     </div>
-  //   );
-  // }
-
-  const totalLines = mockUserStats.totalLines;
-  const languages = mockUserStats.languages;
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="bg-carmine/20 border border-carmine text-carmine px-6 py-4 rounded-xl mb-4 text-center">
+          {error}
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-carmine rounded-xl hover:bg-carmine/90 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
